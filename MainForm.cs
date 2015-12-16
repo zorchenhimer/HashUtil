@@ -193,6 +193,20 @@ namespace HashUtil {
                 if (header.Width < 150)
                     header.Width = 150;
             lvMain.EndUpdate();
+            lblFileCount.Text = lvMain.Items.Count.ToString();
+        }
+
+        private void btnSave_Click(object sender, EventArgs e) {
+            OpenFileDialog fd = new OpenFileDialog();
+            fd.Multiselect = false;
+            fd.CheckFileExists = false;
+            DialogResult res = fd.ShowDialog();
+            if (res == DialogResult.OK) {
+                StreamWriter writer = new StreamWriter(fd.FileName);
+                foreach(FileInfo f in FileList)
+                    writer.WriteLine(f.FileString());
+                writer.Close();
+            }
         }
     }
 }
