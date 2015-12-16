@@ -15,6 +15,8 @@ namespace HashUtil {
         private List<FileInfo> FileList;
         private BackgroundWorker bw;
         private bool running;
+        private long lastUpdate = 0;
+        private bool firstUpdate = true;
 
         public MainForm() {
             InitializeComponent();
@@ -43,6 +45,10 @@ namespace HashUtil {
             lvMain.Columns.Add(h3);
             lvMain.Columns.Add(h4);
 
+            foreach (ColumnHeader header in lvMain.Columns)
+                if (header.Width < 150)
+                    header.Width = 150;
+
             running = false;
         }
 
@@ -53,20 +59,27 @@ namespace HashUtil {
 
             List<FileInfo> fileList = (List<FileInfo>)e.Argument;
             foreach(FileInfo file in fileList) {
+                bool tooshort = false;
                 FileStream fs = new FileStream(file.Name, FileMode.Open);
+                if (fs.Length / 1024 / 1024 < 1)
+                    tooshort = true;
                 file.MD5 = "Hashing...";
-                bw.ReportProgress(0, file);
+                //Console.WriteLine("Length of stream: " + fs.Length);
+                if (!tooshort)
+                    bw.ReportProgress(0, file);
                 
                 string hex_hash = BitConverter.ToString(sp.ComputeHash(fs));
                 file.MD5 = hex_hash;
                 file.CRC32 = "Hashing...";
-                bw.ReportProgress(0, file);
+                if (!tooshort)
+                    bw.ReportProgress(0, file);
                 
                 fs.Seek(0, SeekOrigin.Begin);
                 string hex_crc = BitConverter.ToString(crc.ComputeHash(fs)).Replace("-", "");
                 file.CRC32 = hex_crc;
                 file.SHA1 = "Hashing...";
-                bw.ReportProgress(0, file);
+                if (!tooshort)
+                    bw.ReportProgress(0, file);
 
                 fs.Seek(0, SeekOrigin.Begin);
                 string hex_sha = BitConverter.ToString(sha.ComputeHash(fs));
@@ -92,6 +105,8 @@ namespace HashUtil {
             btnAdd.Enabled = true;
             btnClear.Enabled = true;
             btnExit.Enabled = true;
+            firstUpdate = true;
+            UpdateListView();
         }
 
         private void btnExit_Click(object sender, EventArgs e) {
@@ -119,16 +134,24 @@ namespace HashUtil {
             if (res == DialogResult.OK) {
                 foreach(string file in fd.FileNames)
                     FileList.Add(new FileInfo(file));
+                firstUpdate = true;
                 UpdateListView();
             }
         }
 
         private void btnClear_Click(object sender, EventArgs e) {
+            firstUpdate = true;
             FileList.Clear();
             UpdateListView();
         }
 
         private void UpdateListView() {
+            // TODO: make this milisecond based
+            if (!firstUpdate && DateTime.Now.Ticks - lastUpdate < 10000000)
+                return;
+
+            firstUpdate = false;
+            lastUpdate = DateTime.Now.Ticks;
             lvMain.Items.Clear();
             lvMain.BeginUpdate();
             bool even = true;
@@ -167,8 +190,8 @@ namespace HashUtil {
             }
             lvMain.AutoResizeColumns(ColumnHeaderAutoResizeStyle.ColumnContent);
             foreach(ColumnHeader header in lvMain.Columns)
-                if (header.Width < 50)
-                    header.Width = 50;
+                if (header.Width < 150)
+                    header.Width = 150;
             lvMain.EndUpdate();
         }
     }
