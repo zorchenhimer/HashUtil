@@ -131,6 +131,7 @@ namespace HashUtil {
             fd.CheckFileExists = true;
             DialogResult res = fd.ShowDialog();
             if (res == DialogResult.OK) {
+                FileList.Clear();
                 foreach(string file in fd.FileNames)
                     FileList.Add(new FileInfo(file));
                 UpdateListView();
