@@ -15,8 +15,6 @@ namespace HashUtil {
         private List<FileInfo> FileList;
         private BackgroundWorker bw;
         private bool running;
-        private long lastUpdate = 0;
-        private bool firstUpdate = true;
 
         public MainForm() {
             InitializeComponent();
@@ -97,15 +95,16 @@ namespace HashUtil {
                     break;
                 idx++;
             }
-            FileList.ElementAt(idx).MD5 = f.MD5;
-            UpdateListView();
+
+            lvMain.Items[idx].SubItems[1].Text = f.MD5;
+            lvMain.Items[idx].SubItems[2].Text = f.CRC32;
+            lvMain.Items[idx].SubItems[3].Text = f.SHA1;
         }
 
         private void Bw_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e) {
             btnAdd.Enabled = true;
             btnClear.Enabled = true;
             btnExit.Enabled = true;
-            firstUpdate = true;
             UpdateListView();
         }
 
@@ -134,30 +133,22 @@ namespace HashUtil {
             if (res == DialogResult.OK) {
                 foreach(string file in fd.FileNames)
                     FileList.Add(new FileInfo(file));
-                firstUpdate = true;
                 UpdateListView();
             }
         }
 
         private void btnClear_Click(object sender, EventArgs e) {
-            firstUpdate = true;
             FileList.Clear();
             UpdateListView();
         }
 
         private void UpdateListView() {
-            // TODO: make this milisecond based
-            if (!firstUpdate && DateTime.Now.Ticks - lastUpdate < 10000000)
-                return;
-
-            firstUpdate = false;
-            lastUpdate = DateTime.Now.Ticks;
             lvMain.Items.Clear();
             lvMain.BeginUpdate();
             bool even = true;
             foreach(FileInfo file in FileList) {
                 ListViewItem i = new ListViewItem();
-                i.Text = file.Name;
+                i.Text = file.Basename;
 
                 if (file.MD5 == null)
                     if (running)
