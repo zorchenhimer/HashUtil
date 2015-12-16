@@ -48,6 +48,7 @@ namespace HashUtil {
                     header.Width = 150;
 
             running = false;
+            btnSave.Enabled = false;
         }
 
         private void Bw_DoWork(object sender, DoWorkEventArgs e) {
@@ -105,6 +106,7 @@ namespace HashUtil {
             btnAdd.Enabled = true;
             btnClear.Enabled = true;
             btnExit.Enabled = true;
+            btnSave.Enabled = true;
             UpdateListView();
         }
 
@@ -122,6 +124,7 @@ namespace HashUtil {
             btnAdd.Enabled = false;
             btnClear.Enabled = false;
             btnExit.Enabled = false;
+            btnSave.Enabled = false;
             bw.RunWorkerAsync(FileList);
         }
 
