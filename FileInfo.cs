@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace HashUtil {
@@ -13,7 +14,15 @@ namespace HashUtil {
         private string _crc32;
         private string _sha1;
 
-        public string Name { get { return _name; } set { _name = value; } }
+        private string _dir;
+
+        private static Regex re_line = new Regex("^([a-fA-F0-9]{40}) ([a-fA-F0-9]{32}) ([a-fA-F0-9]{8}) (.+)$");
+
+        public string Name { get {
+                if (_dir != null && _dir.Length > 0)
+                    return _dir + _name;
+                return _name;
+            } set { _name = value; } }
         public string Basename { get {
                 return Path.GetFileName(_name);
             } }
@@ -45,8 +54,28 @@ namespace HashUtil {
             this.Name = name;
         }
 
+        public void SetDirectory(string directory) {
+            if (Directory.Exists(directory)) {
+                _dir = directory + Path.DirectorySeparatorChar;
+            } else
+                throw new Exception("Directory \"" + directory + "\" does not exist!");
+        }
+
         public string FileString() {
             return SHA1 + " " + MD5 + " " + CRC32 + " " + Basename;
+        }
+
+        public static FileInfo ParseInfoLine(string line) {
+            FileInfo fi = new FileInfo();
+            Match m_line = re_line.Match(line);
+            if (m_line.Success) {
+                fi.SHA1 = m_line.Groups[1].ToString();
+                fi.MD5 = m_line.Groups[2].ToString();
+                fi.CRC32 = m_line.Groups[3].ToString();
+                fi.Name = m_line.Groups[4].ToString();
+                return fi;
+            }
+            throw new Exception("No match on line" + Environment.NewLine + line);
         }
     }
 }
