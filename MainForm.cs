@@ -67,8 +67,8 @@ namespace HashUtil {
                 try {
                     fs = new FileStream(file.Name, FileMode.Open);
                 } catch (Exception ex) {
-                    //bw.ReportProgress(-1, "Unable to open file for reading: " + file.Name);
-                    bw.ReportProgress(-1, ex.Message);
+                    file.Error = ex.Message;
+                    bw.ReportProgress(-1, file);
                     continue;
                 }
                 if (fs.Length / 1024 / 1024 < 1)
@@ -100,16 +100,22 @@ namespace HashUtil {
         }
 
         private void Bw_ProgressChanged(object sender, ProgressChangedEventArgs e) {
-            if (e.ProgressPercentage == -1) {
-                MessageBox.Show("Something broke: " + e.UserState.ToString());
-                return;
-            }
             FileInfo f = (FileInfo)e.UserState;
             int idx = 0;
             foreach(FileInfo file in FileList) {
                 if (file.Name == f.Name)
                     break;
                 idx++;
+            }
+
+            if (e.ProgressPercentage == -1) {
+                //MessageBox.Show("Something broke: " + e.UserState.ToString());
+                lvMain.Items[idx].SubItems[1].Text = f.Error;
+                if (idx % 2 == 0)
+                    lvMain.Items[idx].BackColor = Color.Red;
+                else
+                    lvMain.Items[idx].BackColor = Color.DarkRed;
+                return;
             }
 
             lvMain.Items[idx].SubItems[1].Text = f.MD5;
@@ -126,11 +132,18 @@ namespace HashUtil {
                     failed = true;
             }
 
+            Console.WriteLine("Verify: " + VerifyList.Count + "; failed: " + failed.ToString());
+
             if (failed) {
                 if (idx % 2 == 0)
                     lvMain.Items[idx].BackColor = Color.Red;
                 else
                     lvMain.Items[idx].BackColor = Color.DarkRed;
+            } else {
+                if (idx % 2 == 0)
+                    lvMain.Items[idx].BackColor = Color.Green;
+                else
+                    lvMain.Items[idx].BackColor = Color.DarkGreen;
             }
         }
 

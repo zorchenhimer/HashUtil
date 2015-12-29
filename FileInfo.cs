@@ -16,6 +16,8 @@ namespace HashUtil {
 
         private string _dir;
 
+        public string Error;
+
         private static Regex re_line = new Regex("^([a-fA-F0-9]{40}) ([a-fA-F0-9]{32}) ([a-fA-F0-9]{8}) (.+)$");
 
         public string Name { get {
