@@ -160,7 +160,7 @@ namespace HashUtil {
         }
 
         
-        private void AddFiles() {
+        private void OpenFiles() {
             OpenFileDialog fd = new OpenFileDialog();
             fd.Multiselect = true;
             fd.CheckFileExists = true;
@@ -293,11 +293,11 @@ namespace HashUtil {
         }
 
         private void openFilesToolStripMenuItem_Click(object sender, EventArgs e) {
-            AddFiles();
+            OpenFiles();
         }
 
         private void btnAdd_Click(object sender, EventArgs e) {
-            AddFiles();
+            OpenFiles();
         }
 
         private void btnExit_Click(object sender, EventArgs e) {
