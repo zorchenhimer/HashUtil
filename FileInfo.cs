@@ -18,6 +18,14 @@ namespace HashUtil {
 
         public string Error;
 
+        /*
+            0   question mark
+            1   clock (working)
+            2   green check (ok)
+            3   red exclaim (not ok)
+        */
+        public int status = 0;
+
         private static Regex re_line = new Regex("^([a-fA-F0-9]{40}) ([a-fA-F0-9]{32}) ([a-fA-F0-9]{8}) (.+)$");
 
         public string Name { get {

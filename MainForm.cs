@@ -33,18 +33,19 @@ namespace HashUtil {
             h1.Text = "Filename";
 
             ColumnHeader h2 = new ColumnHeader();
-            h2.Text = "MD5";
+            h2.Text = "SHA1";
 
             ColumnHeader h3 = new ColumnHeader();
-            h3.Text = "CRC32";
+            h3.Text = "MD5";
 
             ColumnHeader h4 = new ColumnHeader();
-            h4.Text = "SHA1";
-
+            h4.Text = "CRC32";
+            
             lvMain.Columns.Add(h1);
             lvMain.Columns.Add(h2);
             lvMain.Columns.Add(h3);
             lvMain.Columns.Add(h4);
+            lvMain.SmallImageList = imgList;
 
             foreach (ColumnHeader header in lvMain.Columns)
                 if (header.Width < 150)
@@ -68,6 +69,7 @@ namespace HashUtil {
                     fs = new FileStream(file.Name, FileMode.Open);
                 } catch (Exception ex) {
                     file.Error = ex.Message;
+                    file.status = 3;
                     bw.ReportProgress(-1, file);
                     continue;
                 }
@@ -94,8 +96,10 @@ namespace HashUtil {
                 fs.Seek(0, SeekOrigin.Begin);
                 string hex_sha = BitConverter.ToString(sha.ComputeHash(fs));
                 file.SHA1 = hex_sha;
+                file.status = 2;
                 bw.ReportProgress(0, file);
                 fs.Close();
+                
             }
         }
 
@@ -109,18 +113,13 @@ namespace HashUtil {
             }
 
             if (e.ProgressPercentage == -1) {
-                //MessageBox.Show("Something broke: " + e.UserState.ToString());
                 lvMain.Items[idx].SubItems[1].Text = f.Error;
-                if (idx % 2 == 0)
-                    lvMain.Items[idx].BackColor = Color.Red;
-                else
-                    lvMain.Items[idx].BackColor = Color.DarkRed;
-                return;
             }
 
-            lvMain.Items[idx].SubItems[1].Text = f.MD5;
-            lvMain.Items[idx].SubItems[2].Text = f.CRC32;
-            lvMain.Items[idx].SubItems[3].Text = f.SHA1;
+            lvMain.Items[idx].ImageIndex = f.status;
+            lvMain.Items[idx].SubItems[1].Text = f.SHA1;
+            lvMain.Items[idx].SubItems[2].Text = f.MD5;
+            lvMain.Items[idx].SubItems[3].Text = f.CRC32;
 
             bool failed = false;
             if (VerifyList.Count > 0) {
@@ -132,18 +131,10 @@ namespace HashUtil {
                     failed = true;
             }
 
-            Console.WriteLine("Verify: " + VerifyList.Count + "; failed: " + failed.ToString());
+            Console.WriteLine("Verify: " + VerifyList.Count + "; failed: " + failed.ToString() + "; status: " + f.status);
 
             if (failed) {
-                if (idx % 2 == 0)
-                    lvMain.Items[idx].BackColor = Color.Red;
-                else
-                    lvMain.Items[idx].BackColor = Color.DarkRed;
-            } else {
-                if (idx % 2 == 0)
-                    lvMain.Items[idx].BackColor = Color.Green;
-                else
-                    lvMain.Items[idx].BackColor = Color.DarkGreen;
+                f.status = 3;
             }
         }
 
@@ -207,6 +198,15 @@ namespace HashUtil {
             foreach(FileInfo file in FileList) {
                 ListViewItem i = new ListViewItem();
                 i.Text = file.Basename;
+                i.ImageIndex = file.status;
+
+                if (file.SHA1 == null)
+                    if (running)
+                        i.SubItems.Add("Waiting...");
+                    else
+                        i.SubItems.Add("");
+                else
+                    i.SubItems.Add(file.SHA1);
 
                 if (file.MD5 == null)
                     if (running)
@@ -223,14 +223,6 @@ namespace HashUtil {
                         i.SubItems.Add("");
                 else
                     i.SubItems.Add(file.CRC32);
-
-                if (file.SHA1 == null)
-                    if (running)
-                        i.SubItems.Add("Waiting...");
-                    else
-                        i.SubItems.Add("");
-                else
-                    i.SubItems.Add(file.SHA1);
 
                 if (even)
                     i.BackColor = Color.LightBlue;
