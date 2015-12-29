@@ -10,14 +10,10 @@ namespace HashUtil {
     class FileInfo {
 
         private string _name;
-        private string _md5;
-        private string _crc32;
-        private string _sha1;
+        private string _hash;
 
         private string _dir;
-
-        public string Error;
-
+        
         /*
             0   question mark
             1   clock (working)
@@ -26,7 +22,13 @@ namespace HashUtil {
         */
         public int status = 0;
 
-        private static Regex re_line = new Regex("^([a-fA-F0-9]{40}) ([a-fA-F0-9]{32}) ([a-fA-F0-9]{8}) (.+)$");
+        //private static Regex re_line = new Regex("^([a-fA-F0-9]{40}) ([a-fA-F0-9]{32}) ([a-fA-F0-9]{8}) (.+)$");
+        private static Regex re_hash = new Regex(@"^([a-fA-F0-9]+)\s(.+)$");
+        private static Regex re_hash_b = new Regex(@"^(.+)\s([a-fA-F0-9]+)$");
+
+
+        public string Error;
+        public Hashes.Type HashType;
 
         public string Name { get {
                 if (_dir != null && _dir.Length > 0)
@@ -37,25 +39,11 @@ namespace HashUtil {
                 return Path.GetFileName(_name);
             } }
 
-        public string MD5   { get { return _md5; }
+        public string Hash   { get { return _hash; }
             set {
                 if (value == null)
                     return;
-                _md5 = value.Replace("-", "");
-            } }
-
-        public string CRC32 { get { return _crc32; }
-            set {
-                if (value == null)
-                    return;
-                _crc32 = value.Replace("-", "");
-            } }
-
-        public string SHA1  { get { return _sha1; }
-            set {
-                if (value == null)
-                    return;
-                _sha1 = value.Replace("-", "");
+                _hash = value.Replace("-", "");
             } }
 
         public FileInfo() {}
@@ -72,17 +60,24 @@ namespace HashUtil {
         }
 
         public string FileString() {
-            return SHA1 + " " + MD5 + " " + CRC32 + " " + Basename;
+            return Hash + " " + Basename;
         }
 
         public static FileInfo ParseInfoLine(string line) {
             FileInfo fi = new FileInfo();
-            Match m_line = re_line.Match(line);
+            Match m_line = re_hash.Match(line);
             if (m_line.Success) {
-                fi.SHA1 = m_line.Groups[1].ToString();
-                fi.MD5 = m_line.Groups[2].ToString();
-                fi.CRC32 = m_line.Groups[3].ToString();
-                fi.Name = m_line.Groups[4].ToString();
+                fi.Hash = m_line.Groups[1].ToString();
+                fi.Name = m_line.Groups[2].ToString();
+                fi.HashType = Hashes.FindType(fi.Hash);
+                return fi;
+            }
+
+            Match m_line_b = re_hash_b.Match(line);
+            if (m_line_b.Success) {
+                fi.Hash = m_line_b.Groups[2].ToString();
+                fi.Name = m_line_b.Groups[1].ToString();
+                fi.HashType = Hashes.FindType(fi.Hash);
                 return fi;
             }
             throw new Exception("No match on line" + Environment.NewLine + line);

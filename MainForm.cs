@@ -18,6 +18,8 @@ namespace HashUtil {
         private BackgroundWorker bw;
         private bool running;
 
+        private Hashes.Type currentHash;
+
         public MainForm() {
             InitializeComponent();
             FileList = new List<FileInfo>();
@@ -33,18 +35,12 @@ namespace HashUtil {
             h1.Text = "Filename";
 
             ColumnHeader h2 = new ColumnHeader();
-            h2.Text = "SHA1";
+            h2.Text = "Hash";
 
             ColumnHeader h3 = new ColumnHeader();
-            h3.Text = "MD5";
-
-            ColumnHeader h4 = new ColumnHeader();
-            h4.Text = "CRC32";
+            h3.Text = "Expected";
             
-            lvMain.Columns.Add(h1);
-            lvMain.Columns.Add(h2);
-            lvMain.Columns.Add(h3);
-            lvMain.Columns.Add(h4);
+            lvMain.Columns.AddRange(new ColumnHeader[] { h1, h2, h3 });
             lvMain.SmallImageList = imgList;
 
             foreach (ColumnHeader header in lvMain.Columns)
@@ -54,16 +50,68 @@ namespace HashUtil {
             running = false;
             btnSave.Enabled = false;
             saveToolStripMenuItem.Enabled = false;
+            
+            ToolStripMenuItem h_crc32 = new ToolStripMenuItem();
+            h_crc32.Text = "CRC32";
+            h_crc32.Checked = true;
+            h_crc32.Click += Hash_Click;
+
+            ToolStripMenuItem h_md5 = new ToolStripMenuItem();
+            h_md5.Text = "MD5";
+            h_md5.Checked = false;
+            h_md5.Click += Hash_Click;
+
+            ToolStripMenuItem h_sha1 = new ToolStripMenuItem();
+            h_sha1.Text = "SHA1";
+            h_sha1.Checked = false;
+            h_sha1.Click += Hash_Click;
+
+            ToolStripMenuItem h_sha256 = new ToolStripMenuItem();
+            h_sha256.Text = "SHA256";
+            h_sha256.Checked = false;
+            h_sha256.Click += Hash_Click;
+
+            hashTypeToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { h_crc32, h_md5, h_sha1, h_sha256 });
+            currentHash = Hashes.Type.CRC32;
+        }
+
+        // Uncheck all hash types in the menu
+        private void uncheck_hashes() {
+            foreach(ToolStripMenuItem item in hashTypeToolStripMenuItem.DropDownItems)
+                item.Checked = false;
+        }
+
+        private void hashes_toggleEnable() {
+            foreach(ToolStripMenuItem item in hashTypeToolStripMenuItem.DropDownItems)
+                item.Enabled = !item.Enabled;
+        }
+
+        private void Hash_Click(object sender, EventArgs e) {
+            ToolStripMenuItem item = (ToolStripMenuItem)sender;
+            uncheck_hashes();
+            item.Checked = true;
+            currentHash = Hashes.ParseType(item.Text);
+            lvMain.Columns[1].Text = item.Text;
+            VerifyList.Clear();
         }
 
         private void Bw_DoWork(object sender, DoWorkEventArgs e) {
-            MD5CryptoServiceProvider sp = new MD5CryptoServiceProvider();
-            Crc32 crc = new Crc32();
-            SHA1CryptoServiceProvider sha = new SHA1CryptoServiceProvider();
+            object sp = null;
+            if (currentHash == Hashes.Type.CRC32)
+                sp = new Crc32();
+            else if (currentHash == Hashes.Type.MD5)
+                sp = new  MD5CryptoServiceProvider();
+            else if (currentHash == Hashes.Type.SHA1)
+                sp = new SHA1CryptoServiceProvider();
+            else if (currentHash == Hashes.Type.SHA256)
+                sp = new SHA256CryptoServiceProvider();
+            else {
+                bw.ReportProgress(-2, "Invalid hash type: " + currentHash.ToString());
+                return;
+            }
 
             List<FileInfo> fileList = (List<FileInfo>)e.Argument;
             foreach(FileInfo file in fileList) {
-                bool tooshort = false;
                 FileStream fs = null;
                 try {
                     fs = new FileStream(file.Name, FileMode.Open);
@@ -73,33 +121,31 @@ namespace HashUtil {
                     bw.ReportProgress(-1, file);
                     continue;
                 }
-                if (fs.Length / 1024 / 1024 < 1)
-                    tooshort = true;
-                file.MD5 = "Hashing...";
-                //Console.WriteLine("Length of stream: " + fs.Length);
-                if (!tooshort)
-                    bw.ReportProgress(0, file);
                 
-                string hex_hash = BitConverter.ToString(sp.ComputeHash(fs));
-                file.MD5 = hex_hash;
-                file.CRC32 = "Hashing...";
-                if (!tooshort)
-                    bw.ReportProgress(0, file);
-                
-                fs.Seek(0, SeekOrigin.Begin);
-                string hex_crc = BitConverter.ToString(crc.ComputeHash(fs)).Replace("-", "");
-                file.CRC32 = hex_crc;
-                file.SHA1 = "Hashing...";
-                if (!tooshort)
-                    bw.ReportProgress(0, file);
-
-                fs.Seek(0, SeekOrigin.Begin);
-                string hex_sha = BitConverter.ToString(sha.ComputeHash(fs));
-                file.SHA1 = hex_sha;
-                file.status = 2;
+                //file.Hash = "Hashing...";
+                file.status = 1;
+                byte[] hash = null;
+                switch (currentHash) {
+                    case Hashes.Type.CRC32:
+                        Crc32 p = (Crc32)sp;
+                        hash = p.ComputeHash(fs);
+                        break;
+                    case Hashes.Type.MD5:
+                        MD5CryptoServiceProvider pm = (MD5CryptoServiceProvider)sp;
+                        hash = pm.ComputeHash(fs);
+                        break;
+                    case Hashes.Type.SHA1:
+                        SHA1CryptoServiceProvider ps = (SHA1CryptoServiceProvider)sp;
+                        hash = ps.ComputeHash(fs);
+                        break;
+                    case Hashes.Type.SHA256:
+                        SHA256CryptoServiceProvider ps2 = (SHA256CryptoServiceProvider)sp;
+                        hash = ps2.ComputeHash(fs);
+                        break;
+                }
+                file.Hash = BitConverter.ToString(hash);
                 bw.ReportProgress(0, file);
                 fs.Close();
-                
             }
         }
 
@@ -117,25 +163,17 @@ namespace HashUtil {
             }
 
             lvMain.Items[idx].ImageIndex = f.status;
-            lvMain.Items[idx].SubItems[1].Text = f.SHA1;
-            lvMain.Items[idx].SubItems[2].Text = f.MD5;
-            lvMain.Items[idx].SubItems[3].Text = f.CRC32;
-
-            bool failed = false;
+            lvMain.Items[idx].SubItems[1].Text = f.Hash;
+            
             if (VerifyList.Count > 0) {
-                if (VerifyList[idx].SHA1 != f.SHA1)
-                    failed = true;
-                if (VerifyList[idx].MD5 != f.MD5)
-                    failed = true;
-                if (VerifyList[idx].CRC32 != f.CRC32)
-                    failed = true;
-            }
+                if (VerifyList[idx].Hash != f.Hash)
+                    f.status = 3;
+                else
+                    f.status = 2;
+            } else
+                f.status = 2;
 
-            Console.WriteLine("Verify: " + VerifyList.Count + "; failed: " + failed.ToString() + "; status: " + f.status);
-
-            if (failed) {
-                f.status = 3;
-            }
+            Console.WriteLine("Verify: " + VerifyList.Count + "; status: " + f.status);
         }
 
         private void Bw_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e) {
@@ -144,14 +182,14 @@ namespace HashUtil {
             btnExit.Enabled = true;
             btnSave.Enabled = true;
             saveToolStripMenuItem.Enabled = true;
+            hashes_toggleEnable();
             UpdateListView();
         }
 
 
         private void btnHash_Click(object sender, EventArgs e) {
             for(int i = 0; i < FileList.Count; i++) {
-                FileList.ElementAt(i).MD5 = null;
-                FileList.ElementAt(i).CRC32 = null;
+                FileList.ElementAt(i).Hash = null;
             }
             running = true;
             UpdateListView();
@@ -160,6 +198,7 @@ namespace HashUtil {
             btnExit.Enabled = false;
             btnSave.Enabled = false;
             saveToolStripMenuItem.Enabled = false;
+            hashes_toggleEnable();
             bw.RunWorkerAsync(FileList);
         }
 
@@ -179,7 +218,6 @@ namespace HashUtil {
 
         private void SaveHashes() {
             SaveFileDialog fd = new SaveFileDialog();
-            //fd.Multiselect = false;
             fd.Filter = "Hash File|*.txt";
             fd.CheckFileExists = false;
             DialogResult res = fd.ShowDialog();
@@ -195,34 +233,28 @@ namespace HashUtil {
             lvMain.Items.Clear();
             lvMain.BeginUpdate();
             bool even = true;
-            foreach(FileInfo file in FileList) {
+            bool verifying = false;
+            if (VerifyList.Count > 0)
+                verifying = true;
+
+            for( int idx = 0; idx < FileList.Count(); idx++) {
+                FileInfo file = FileList[idx];
                 ListViewItem i = new ListViewItem();
                 i.Text = file.Basename;
                 i.ImageIndex = file.status;
 
-                if (file.SHA1 == null)
+                if (file.Hash == null)
                     if (running)
                         i.SubItems.Add("Waiting...");
                     else
                         i.SubItems.Add("");
                 else
-                    i.SubItems.Add(file.SHA1);
-
-                if (file.MD5 == null)
-                    if (running)
-                        i.SubItems.Add("Waiting...");
-                    else
-                        i.SubItems.Add("");
+                    i.SubItems.Add(file.Hash);
+                
+                if (verifying)
+                    i.SubItems.Add(VerifyList[idx].Hash);
                 else
-                    i.SubItems.Add(file.MD5);
-
-                if (file.CRC32 == null)
-                    if (running)
-                        i.SubItems.Add("Waiting...");
-                    else
-                        i.SubItems.Add("");
-                else
-                    i.SubItems.Add(file.CRC32);
+                    i.SubItems.Add("");
 
                 if (even)
                     i.BackColor = Color.LightBlue;
@@ -273,6 +305,10 @@ namespace HashUtil {
                     FileList.Add(new FileInfo(fi.Name));
                 }
             }
+
+            currentHash = VerifyList[0].HashType;
+            lvMain.Columns[1].Text = Hashes.String(currentHash);
+
             UpdateListView();
             reader.Close();
         }
