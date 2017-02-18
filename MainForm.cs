@@ -13,24 +13,24 @@ using System.Windows.Forms;
 
 namespace HashUtil {
     public partial class MainForm : Form {
-        private List<FileInfo> FileList;
-        private List<FileInfo> VerifyList;
-        private BackgroundWorker bw;
-        private bool running;
+        private List<FileInfo> FileList = new List<FileInfo>();
+        private List<FileInfo> VerifyList = new List<FileInfo>();
+        private BackgroundWorker bw = new BackgroundWorker();
+        private bool running = false;
 
         private Hashes.Type currentHash;
 
         public MainForm() {
             InitializeComponent();
-            FileList = new List<FileInfo>();
-            VerifyList = new List<FileInfo>();
-            bw = new BackgroundWorker();
+
+            // Setup the background worker.
             bw.WorkerReportsProgress = true;
             bw.WorkerSupportsCancellation = false;
             bw.DoWork += Bw_DoWork;
             bw.ProgressChanged += Bw_ProgressChanged;
             bw.RunWorkerCompleted += Bw_RunWorkerCompleted;
             
+            // Build the table with headers
             ColumnHeader h1 = new ColumnHeader();
             h1.Text = "Filename";
 
@@ -47,10 +47,10 @@ namespace HashUtil {
                 if (header.Width < 150)
                     header.Width = 150;
 
-            running = false;
             btnSave.Enabled = false;
             saveToolStripMenuItem.Enabled = false;
             
+            // Build the hash menu
             ToolStripMenuItem h_crc32 = new ToolStripMenuItem();
             h_crc32.Text = "CRC32";
             h_crc32.Checked = true;
@@ -72,6 +72,8 @@ namespace HashUtil {
             h_sha256.Click += Hash_Click;
 
             hashTypeToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { h_crc32, h_md5, h_sha1, h_sha256 });
+
+            // default to CRC32.
             currentHash = Hashes.Type.CRC32;
         }
 
@@ -86,6 +88,7 @@ namespace HashUtil {
                 item.Enabled = !item.Enabled;
         }
 
+        // Event handler for the hash type menu dropdown.
         private void Hash_Click(object sender, EventArgs e) {
             ToolStripMenuItem item = (ToolStripMenuItem)sender;
             uncheck_hashes();
@@ -96,22 +99,30 @@ namespace HashUtil {
         }
 
         private void Bw_DoWork(object sender, DoWorkEventArgs e) {
-            object sp = null;
-            if (currentHash == Hashes.Type.CRC32)
-                sp = new Crc32();
-            else if (currentHash == Hashes.Type.MD5)
-                sp = new  MD5CryptoServiceProvider();
-            else if (currentHash == Hashes.Type.SHA1)
-                sp = new SHA1CryptoServiceProvider();
-            else if (currentHash == Hashes.Type.SHA256)
-                sp = new SHA256CryptoServiceProvider();
-            else {
-                bw.ReportProgress(-2, "Invalid hash type: " + currentHash.ToString());
-                return;
+            // Load the correct hash service provider.  We'll use the same one for each file.
+            HashAlgorithm sp = null;
+            switch (currentHash) {
+                case Hashes.Type.CRC32:
+                    sp = new Crc32();
+                    break;
+                case Hashes.Type.MD5:
+                    sp = new  MD5CryptoServiceProvider();
+                    break;
+                case Hashes.Type.SHA1:
+                    sp = new SHA1CryptoServiceProvider();
+                    break;
+                case Hashes.Type.SHA256:
+                    sp = new SHA256CryptoServiceProvider();
+                    break;
+                default:
+                    bw.ReportProgress(-2, "Invalid hash type: " + currentHash.ToString());
+                    return;
             }
 
+            // Hash each file on the list, one at a time.
             List<FileInfo> fileList = (List<FileInfo>)e.Argument;
             foreach(FileInfo file in fileList) {
+                // Try to open the file.  If it fails, skip it and move on.
                 FileStream fs = null;
                 try {
                     fs = new FileStream(file.Name, FileMode.Open);
@@ -122,60 +133,58 @@ namespace HashUtil {
                     continue;
                 }
                 
-                //file.Hash = "Hashing...";
-                byte[] hash = null;
-                switch (currentHash) {
-                    case Hashes.Type.CRC32:
-                        Crc32 p = (Crc32)sp;
-                        hash = p.ComputeHash(fs);
-                        break;
-                    case Hashes.Type.MD5:
-                        MD5CryptoServiceProvider pm = (MD5CryptoServiceProvider)sp;
-                        hash = pm.ComputeHash(fs);
-                        break;
-                    case Hashes.Type.SHA1:
-                        SHA1CryptoServiceProvider ps = (SHA1CryptoServiceProvider)sp;
-                        hash = ps.ComputeHash(fs);
-                        break;
-                    case Hashes.Type.SHA256:
-                        SHA256CryptoServiceProvider ps2 = (SHA256CryptoServiceProvider)sp;
-                        hash = ps2.ComputeHash(fs);
-                        break;
-                }
                 file.status = FileInfo.FileStatus.WORKING;
-                file.Hash = BitConverter.ToString(hash);
-                bw.ReportProgress(0, file);
+                bw.ReportProgress(1, file);
+                byte[] hash = sp.ComputeHash(fs);
                 fs.Close();
+                
+                // Update the screen to show progress.
+                file.Hash = BitConverter.ToString(hash);
+                bw.ReportProgress(2, file);
             }
         }
 
+        // Update the list of files on screen to reflect their current status.
         private void Bw_ProgressChanged(object sender, ProgressChangedEventArgs e) {
             FileInfo f = (FileInfo)e.UserState;
-            int idx = 0;
-            foreach(FileInfo file in FileList) {
-                if (file.Name == f.Name)
+
+            // Find the correct file in the list.  Declare idx outside of the
+            // loop so we can use it later.
+            int idx;
+            for(idx = 0; idx < FileList.Count; idx++) {
+                if (FileList[idx].Name == f.Name)
                     break;
-                idx++;
             }
 
-            if (e.ProgressPercentage == -1) {
+            if (e.ProgressPercentage < 0) {
                 lvMain.Items[idx].SubItems[1].Text = f.Error;
+            }
+            
+            
+            
+            if (e.ProgressPercentage == 1) {
+                lvMain.Items[idx].SubItems[1].Text = "Working...";
+                f.status = FileInfo.FileStatus.WORKING;
+            } else {
+                lvMain.Items[idx].SubItems[1].Text = f.Hash;
+                if (VerifyList.Count > 0) {
+                    if (VerifyList[idx].Hash != f.Hash) {
+                        f.status = FileInfo.FileStatus.NOTOK;
+                        Console.WriteLine("Verify failed: " + VerifyList[idx].Hash + " != " + f.Hash);
+                    } else {
+                        f.status = FileInfo.FileStatus.OK;
+                        Console.WriteLine("Verify passed: " + VerifyList[idx].Hash + " == " + f.Hash);
+                    }
+                } else
+                    f.status = FileInfo.FileStatus.OK;
             }
 
             lvMain.Items[idx].ImageIndex = (int)f.status;
-            lvMain.Items[idx].SubItems[1].Text = f.Hash;
-            
-            if (VerifyList.Count > 0) {
-                if (VerifyList[idx].Hash != f.Hash)
-                    f.status = FileInfo.FileStatus.NOTOK;
-                else
-                    f.status = FileInfo.FileStatus.OK;
-            } else
-                f.status = FileInfo.FileStatus.OK;
 
             Console.WriteLine("Verify: " + VerifyList.Count + "; status: " + f.status);
         }
 
+        // Cleanup after we're done.
         private void Bw_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e) {
             btnAdd.Enabled = true;
             btnClear.Enabled = true;
@@ -186,10 +195,12 @@ namespace HashUtil {
             UpdateListView();
         }
 
-
-        private void btnHash_Click(object sender, EventArgs e) {
+        // Clear the previous hashes, disable some buttons, and fire up the
+        // background worker.
+        private void StartHashing() {
             for(int i = 0; i < FileList.Count; i++) {
-                FileList.ElementAt(i).Hash = null;
+                FileList.ElementAt(i).Hash = "";
+                FileList.ElementAt(i).status = FileInfo.FileStatus.UNKNOWN;
             }
             running = true;
             UpdateListView();
@@ -201,8 +212,8 @@ namespace HashUtil {
             hashes_toggleEnable();
             bw.RunWorkerAsync(FileList);
         }
-
         
+        // Clear and add some files to the list.
         private void OpenFiles() {
             OpenFileDialog fd = new OpenFileDialog();
             fd.Multiselect = true;
@@ -231,7 +242,7 @@ namespace HashUtil {
 
         private void UpdateListView() {
             lvMain.Items.Clear();
-            lvMain.BeginUpdate();
+            lvMain.BeginUpdate();   // Basically a SQL transaction but for a list view.
             bool even = true;
             bool verifying = false;
             if (VerifyList.Count > 0)
@@ -295,6 +306,8 @@ namespace HashUtil {
 
             StreamReader reader = new StreamReader(fd.FileName);
             string[] lines = Regex.Split(reader.ReadToEnd(), "\r\n");
+            reader.Close();
+
             VerifyList.Clear();
             FileList.Clear();
             foreach(string line in lines) {
@@ -310,7 +323,15 @@ namespace HashUtil {
             lvMain.Columns[1].Text = Hashes.String(currentHash);
 
             UpdateListView();
-            reader.Close();
+            StartHashing();
+        }
+
+        /*
+            More than one button can do the same thing.  Have each button call
+            a function instead of dropping the code in the event handler.
+        */
+        private void btnHash_Click(object sender, EventArgs e) {
+            StartHashing();
         }
 
         private void btnSave_Click(object sender, EventArgs e) {
