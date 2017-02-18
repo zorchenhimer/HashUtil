@@ -33,21 +33,28 @@ namespace HashUtil {
         public string Error;
         public Hashes.Type HashType;
 
-        public string Name { get {
+        public string Name {
+            get {
+                // Return with the directory prepended if it exists.
                 if (_dir != null && _dir.Length > 0)
                     return _dir + _name;
                 return _name;
-            } set { _name = value; } }
-        public string Basename { get {
-                return Path.GetFileName(_name);
-            } }
+            }
+            set { _name = value; }
+        }
 
-        public string Hash   { get { return _hash; }
+        public string Basename {
+            get { return Path.GetFileName(_name); }
+        }
+
+        public string Hash   {
+            get { return _hash; }
             set {
                 if (value == null)
                     return;
                 _hash = value.Replace("-", "");
-            } }
+            }
+        }
 
         public FileInfo() {}
 
@@ -56,9 +63,9 @@ namespace HashUtil {
         }
 
         public void SetDirectory(string directory) {
-            if (Directory.Exists(directory)) {
+            if (Directory.Exists(directory))
                 _dir = directory + Path.DirectorySeparatorChar;
-            } else
+            else
                 throw new Exception("Directory \"" + directory + "\" does not exist!");
         }
 
@@ -66,6 +73,7 @@ namespace HashUtil {
             return Hash + " " + Basename;
         }
 
+        // Used for loading a list of hashes to verify.
         public static FileInfo ParseInfoLine(string line) {
             FileInfo fi = new FileInfo();
             Match m_line = re_hash.Match(line);
