@@ -9,8 +9,8 @@ using System.Threading.Tasks;
 namespace HashUtil {
     class FileInfo {
 
-        private string _name;
-        private string _hash;
+        private string _name = "";
+        private string _hash = "";
 
         private string _dir;
 
