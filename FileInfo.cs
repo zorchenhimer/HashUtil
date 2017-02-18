@@ -13,14 +13,17 @@ namespace HashUtil {
         private string _hash;
 
         private string _dir;
-        
-        /*
-            0   question mark
-            1   clock (working)
-            2   green check (ok)
-            3   red exclaim (not ok)
-        */
-        public int status = 0;
+
+        // Note that these statuses are in the order that their corresponding
+        // icons are in the form's ImageList collection (imgList). The status is
+        // cast to an int to get the index of the image.
+        public FileStatus status = FileStatus.UNKNOWN;
+        public enum FileStatus {
+            UNKNOWN,
+            WORKING,
+            OK,
+            NOTOK,
+        }
 
         //private static Regex re_line = new Regex("^([a-fA-F0-9]{40}) ([a-fA-F0-9]{32}) ([a-fA-F0-9]{8}) (.+)$");
         private static Regex re_hash = new Regex(@"^([a-fA-F0-9]+)\s(.+)$");

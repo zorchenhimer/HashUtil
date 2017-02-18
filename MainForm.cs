@@ -117,13 +117,12 @@ namespace HashUtil {
                     fs = new FileStream(file.Name, FileMode.Open);
                 } catch (Exception ex) {
                     file.Error = ex.Message;
-                    file.status = 3;
+                    file.status = FileInfo.FileStatus.NOTOK;
                     bw.ReportProgress(-1, file);
                     continue;
                 }
                 
                 //file.Hash = "Hashing...";
-                file.status = 1;
                 byte[] hash = null;
                 switch (currentHash) {
                     case Hashes.Type.CRC32:
@@ -143,6 +142,7 @@ namespace HashUtil {
                         hash = ps2.ComputeHash(fs);
                         break;
                 }
+                file.status = FileInfo.FileStatus.WORKING;
                 file.Hash = BitConverter.ToString(hash);
                 bw.ReportProgress(0, file);
                 fs.Close();
@@ -162,16 +162,16 @@ namespace HashUtil {
                 lvMain.Items[idx].SubItems[1].Text = f.Error;
             }
 
-            lvMain.Items[idx].ImageIndex = f.status;
+            lvMain.Items[idx].ImageIndex = (int)f.status;
             lvMain.Items[idx].SubItems[1].Text = f.Hash;
             
             if (VerifyList.Count > 0) {
                 if (VerifyList[idx].Hash != f.Hash)
-                    f.status = 3;
+                    f.status = FileInfo.FileStatus.NOTOK;
                 else
-                    f.status = 2;
+                    f.status = FileInfo.FileStatus.OK;
             } else
-                f.status = 2;
+                f.status = FileInfo.FileStatus.OK;
 
             Console.WriteLine("Verify: " + VerifyList.Count + "; status: " + f.status);
         }
@@ -241,7 +241,7 @@ namespace HashUtil {
                 FileInfo file = FileList[idx];
                 ListViewItem i = new ListViewItem();
                 i.Text = file.Basename;
-                i.ImageIndex = file.status;
+                i.ImageIndex = (int)file.status;
 
                 if (file.Hash == null)
                     if (running)
